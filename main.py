@@ -4,7 +4,7 @@ import datetime as dt
 import numpy as np
 import yfinance as yf
 
-from bokeh.io import curdoc
+from bokeh.io import curdoc, show
 from bokeh.plotting import figure
 from bokeh.layouts import row, column
 from bokeh.models import TextInput, Button, DatePicker, MultiChoice
@@ -23,7 +23,8 @@ def plot_data(data, indicators, sync_axis=None):
     width = 12 * 60 * 60 * 1000
 
     if sync_axis is not None:
-        p = figure(x_axis_type="datetime", tools="pan, wheel_zoom, box_zoom, reset, save", width=1000, x_range=sync_axis)
+        p = figure(x_axis_type="datetime", tools="pan, wheel_zoom, box_zoom, reset, save",
+                   width=1000, x_range=sync_axis)
     else:
         p = figure(x_axis_type="datetime", tools="pan, wheel_zoom, box_zoom, reset, save", width=1000)
 
@@ -31,8 +32,25 @@ def plot_data(data, indicators, sync_axis=None):
     p.grid.grid_line_alpha = 0.25
 
     p.segment(df.index, df.High, df.index, df.Low, color="black")
-    p.vbar(df.index[gain], width, df.Open[gain], df.Close[gain], fill_color="#00ff00", lien_color="#00ff00")
-    p.vbar(df.index[loss], width, df.Open[loss], df.Close[loss], fill_color="#ff0000", lien_color="#ff0000")
+    p.vbar(df.index[gain], width, df.Open[gain], df.Close[gain], fill_color="#00ff00", line_color="#00ff00")
+    p.vbar(df.index[loss], width, df.Open[loss], df.Close[loss], fill_color="#ff0000", line_color="#ff0000")
+
+    for indicator in indicators:
+        if indicator == "30 Day SMA":
+            df["SMA30"] = df["Close"].rolling(30).mean()
+            p.line(df.index, df.SMA30, color="purple", legend_label="30 Day SMA")
+        elif indicator == "100 Day SMA":
+            df["SMA100"] = df["Close"].rolling(100).mean()
+            p.line(df.index, df.SMA100, color="purple", legend_label="100 Day SMA")
+        elif indicator == "Linear Regression Line":
+            par = np.polyfit(range(len(df.index.values)), df.Close.values, 1, full=True)
+            slope = par[0][0]
+            intercept = par[1][0]
+            y_pred = [slope * i + intercept for i in range(len(df.index.values))]
+            p.segment(df.index[0], y_pred[0], df.index[-1], y_pred[-1], legend_label="Linear Regression", color="red")
+
+        p.legend.loation = "top_left"
+        p.legend.click_policy = "hide"
 
     return p
 
@@ -49,13 +67,16 @@ def on_button_click(ticker1, ticker2, start, end, indicators):
 
 stock1_text = TextInput(title="Stock 1")
 stock2_text = TextInput(title="Stock 2")
-date_picker_from = DatePicker(title="Start Date", value="2020-01-01", min_date="2000-01-01", max_date=dt.datetime.now().strftime("%Y-%m-%d"))
-date_picker_to = DatePicker(title="End Date", value="2020-01-01", min_date="2000-02-01", max_date=dt.datetime.now().strftime("%Y-%m-%d"))
+date_picker_from = DatePicker(title="Start Date", value="2020-01-01", min_date="2000-01-01",
+                              max_date=dt.datetime.now().strftime("%Y-%m-%d"))
+date_picker_to = DatePicker(title="End Date", value="2020-01-01", min_date="2000-02-01",
+                            max_date=dt.datetime.now().strftime("%Y-%m-%d"))
 
 indicator_choice = MultiChoice(options=["100 Day SMA", "30 Day SMA", "Linear Regression Line"])
 
 load_button = Button(label="Load Data", button_type="success")
-load_button.on_click(lambda: on_button_click(stock1_text.value, stock2_text.value, date_picker_from.value, date_picker_to.value, indicator_choice.value))
+load_button.on_click(lambda: on_button_click(stock1_text.value, stock2_text.value, date_picker_from.value,
+                                             date_picker_to.value, indicator_choice.value))
 
 
 layout = column(stock1_text, stock2_text, date_picker_from, date_picker_to, indicator_choice, load_button)
@@ -63,5 +84,6 @@ layout = column(stock1_text, stock2_text, date_picker_from, date_picker_to, indi
 curdoc().clear()
 curdoc().add_root(layout)
 
-# info: Mit dem Terminal in den Entwicklungsornder gehen und dann folgenden Befehl ausführen:
+show(layout)
+# info: Mit dem Terminal in den Entwicklungsordner gehen und dann folgenden Befehl ausführen:
 # bokeh serve --show main.py
